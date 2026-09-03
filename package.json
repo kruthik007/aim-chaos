@@ -1,0 +1,9 @@
+{
+  "name": "aim-chaos",
+  "version": "1.0.0",
+  "description": "Multiplayer party aim game for 2 to 8 friends",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "ws": "^8.18.0" },
+  "license": "MIT"
+}
