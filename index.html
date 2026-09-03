@@ -157,6 +157,10 @@ h2.big{font-family:var(--display);font-size:clamp(36px,8vw,72px);text-align:cent
       <li>Missing costs a little. Shooting a fake, a friend, or the wrong target costs a lot.</li>
     </ul>
   </details>
+  <details>
+    <summary>The mini-games</summary>
+    <ul id="game-list"></ul>
+  </details>
 </section>
 
 <section id="s-lobby" class="screen">
@@ -225,6 +229,8 @@ const { W, H, POWERUPS } = Core;
 const $ = s => document.querySelector(s);
 const show = id => { document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); $(id).classList.add('on'); };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+$('#game-list').innerHTML = Core.MINIGAMES.map(g => `<li><b>${esc(g.name)}</b> — ${esc(g.tag)}${g.rare ? ' Shows up rarely.' : ''}</li>`).join('');
 
 // ---------- audio ----------
 const SFX = {
