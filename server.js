@@ -67,7 +67,7 @@ wss.on('connection', ws => {
   ws.on('close', () => { sockets.delete(id); if (room) room.removePlayer(id); });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log('AIM CHAOS running at http://localhost:' + PORT);
   console.log('Friends on the same wifi: use your LAN IP. Over the internet: expose with ngrok or deploy.');
 });

@@ -330,8 +330,12 @@ function syncTime() {
   S.onPong = m => { const rtt = performance.now() - m.t; if (rtt < best) { best = rtt; S.offset = m.now - (Date.now() - rtt / 2); } };
   ping(); setTimeout(ping, 400); setTimeout(ping, 900);
 }
-$('#btn-create').onclick = () => { $('#menu-msg').textContent = 'Connecting...'; connect(false, { type: 'create', name: myName() }); };
-$('#btn-join').onclick = () => { const code = $('#code').value.trim().toUpperCase(); if (code.length !== 4) return $('#menu-msg').textContent = 'Room codes are 4 characters'; $('#menu-msg').textContent = 'Connecting...'; connect(false, { type: 'join', code, name: myName() }); };
+function connectingMsg() {
+  $('#menu-msg').textContent = 'Connecting...';
+  setTimeout(() => { if ($('#menu-msg').textContent === 'Connecting...') $('#menu-msg').textContent = 'Waking up the server, one moment...'; }, 2500);
+}
+$('#btn-create').onclick = () => { connectingMsg(); connect(false, { type: 'create', name: myName() }); };
+$('#btn-join').onclick = () => { const code = $('#code').value.trim().toUpperCase(); if (code.length !== 4) return $('#menu-msg').textContent = 'Room codes are 4 characters'; connectingMsg(); connect(false, { type: 'join', code, name: myName() }); };
 $('#btn-solo').onclick = () => connect(true, { type: 'create', name: myName(), bots: 3 });
 $('#code').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-join').click(); });
 const leave = () => { if (net) net.close(); net = null; SFX.stopMusic(); G.active = false; show('#s-menu'); $('#menu-msg').textContent = ''; };
