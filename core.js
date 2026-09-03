@@ -19,7 +19,7 @@
     { id: 'reaction',  name: 'Reaction Test', tag: 'Wait for GREEN, then shoot. First shooter wins. Jump the gun and pay.', duration: 40, weight: 2 },
     { id: 'bullseye',   name: 'Bullseye',     tag: 'Concentric rings. Dead center pays huge. Precision beats speed.',    duration: 40, weight: 2 },
     { id: 'colormatch', name: 'Color Match',  tag: 'Shoot only the called color. Any other color costs big.',           duration: 40, weight: 2 },
-    { id: 'whack',       name: 'Whack Streak', tag: 'Targets flash and vanish fast. Chain hits for monster combos.',     duration: 38, weight: 3 },
+    { id: 'decoydash',  name: 'Decoy Dash',   tag: 'Fast targets. Bombs cost big and kill your combo — and get more common as time runs out.', duration: 40, weight: 3 },
     { id: 'chaos',     name: 'CHAOS ROUND',   tag: 'Everything is wrong. The screen tilts, controls flip, targets explode.', duration: 45, weight: 1, rare: true },
   ];
 
@@ -217,15 +217,15 @@
       }
     }
 
-    if (g.id === 'whack') {
-      let t = 500;
-      while (t < dur - 900) {
-        const count = r() < 0.35 ? 2 : 1;
-        for (let k = 0; k < count; k++) {
-          const rad = rand(r, 20, 30);
-          T(Object.assign({ t0: t + k * 60, life: 620, r: rad, kind: 'normal', value: 85 }, inside(rad)));
-        }
-        t += rand(r, 170, 270) / speedUp;
+    if (g.id === 'decoydash') {
+      let t = 600;
+      while (t < dur - 1200) {
+        const progress = t / dur;
+        const bombChance = 0.08 + progress * 0.35; // starts easy, ramps up as the round goes on
+        const rad = rand(r, 22, 34);
+        const isBomb = r() < bombChance;
+        T(Object.assign({ t0: t, life: 1150, r: rad, kind: isBomb ? 'mine' : 'normal', value: isBomb ? -200 : 90 }, inside(rad)));
+        t += rand(r, 240, 400) / speedUp;
       }
     }
 
@@ -436,7 +436,7 @@
       if (tg.value < 0) {
         p.score += tg.value; p.combo = 0;
         if (tg.kind === 'fake' || tg.kind === 'pfake') p.fakes++; else p.wrong++;
-        const msgs = { fake: 'FAKE!', pfake: 'FAKE!', decoy: 'WRONG ONE!', friend: 'THAT WAS A FRIEND!', cwrong: 'WRONG COLOR!' };
+        const msgs = { fake: 'FAKE!', pfake: 'FAKE!', decoy: 'WRONG ONE!', friend: 'THAT WAS A FRIEND!', cwrong: 'WRONG COLOR!', mine: 'BOOM!' };
         this.send(p.id, { type: 'fb', kind: 'bad', tid: tg.id, pts: tg.value, combo: 0, msg: msgs[tg.kind] || 'NO!' });
         return;
       }

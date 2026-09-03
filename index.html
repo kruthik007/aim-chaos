@@ -568,6 +568,7 @@ function targetColor(tg) {
     case 'bomb': return '#8a3dff'; case 'correct': case 'decoy': case 'ccorrect': case 'cwrong': return { red: '#ff2d4b', blue: '#2d8cff', green: '#2dff9a', yellow: '#ffd02d' }[tg.color];
     case 'friend': return (G.players[tg.face % Math.max(1, G.players.length)] || {}).color || '#b6ff2d'; case 'enemy': return '#ff6a2d';
     case 'ring': return '#ffd02d';
+    case 'mine': return '#ff2d4b';
     default: return '#2df0ff';
   }
 }
@@ -695,13 +696,14 @@ function drawTarget(tg, t) {
     else if (tg.kind === 'ring') drawBullseye(r, tg);
     else {
       ctx.shadowColor = color; ctx.shadowBlur = 18;
-      ctx.fillStyle = tg.kind === 'gold' ? '#4a3a00' : tg.kind === 'bomb' ? '#2a1250' : '#160f2a'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+      ctx.fillStyle = tg.kind === 'gold' ? '#4a3a00' : tg.kind === 'bomb' ? '#2a1250' : tg.kind === 'mine' ? '#3a0a12' : '#160f2a'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
       ctx.shadowBlur = 0; ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, r * 0.14); ctx.beginPath(); ctx.arc(0, 0, r * 0.95, 0, 7); ctx.stroke();
       ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.globalAlpha = fade * 0.6; ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, 7); ctx.stroke(); ctx.globalAlpha = fade;
       ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, 0, Math.max(3, r * 0.22), 0, 7); ctx.fill();
       if (tg.kind === 'fake' || (tg.kind === 'pfake' && Math.sin(t / 60) > 0.6)) { ctx.strokeStyle = '#ff2d4b'; ctx.lineWidth = r * 0.18; ctx.beginPath(); ctx.moveTo(-r * .5, -r * .5); ctx.lineTo(r * .5, r * .5); ctx.moveTo(r * .5, -r * .5); ctx.lineTo(-r * .5, r * .5); ctx.stroke(); }
       if (tg.kind === 'gold') { ctx.save(); ctx.rotate(t / 300); ctx.fillStyle = '#fff4c0'; for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.moveTo(r * 0.7, 0); ctx.lineTo(r * 1.35, -3); ctx.lineTo(r * 1.35, 3); ctx.fill(); } ctx.restore(); }
       if (tg.kind === 'bomb') { ctx.fillStyle = '#f4efff'; ctx.font = `900 ${r}px Rubik`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✦', 0, 2); ctx.textBaseline = 'alphabetic'; }
+      if (tg.kind === 'mine') { ctx.font = `900 ${Math.round(r * 1.1)}px Rubik`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('💀', 0, 2); ctx.textBaseline = 'alphabetic'; }
     }
     if (tg.kind !== 'pfake') { ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, left / tg.life)); ctx.stroke(); }
   });
