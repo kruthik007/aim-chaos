@@ -43,6 +43,9 @@ details{width:min(440px,100%);margin-top:16px;color:var(--muted);font-size:15px;
 details summary{cursor:pointer;color:var(--text);font-weight:700}
 details ul{padding-left:18px;margin-top:8px}
 kbd{background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-family:var(--ui)}
+.practice-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.practice-list button{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer}
+.practice-list button:hover{border-color:var(--cyan)}
 
 /* lobby */
 .code{font-family:var(--display);font-size:clamp(48px,10vw,88px);color:var(--gold);letter-spacing:.12em;text-shadow:0 0 30px rgba(255,208,45,.5);cursor:pointer}
@@ -160,6 +163,10 @@ h2.big{font-family:var(--display);font-size:clamp(36px,8vw,72px);text-align:cent
   <details>
     <summary>The mini-games</summary>
     <ul id="game-list"></ul>
+  </details>
+  <details>
+    <summary>Practice a mini-game</summary>
+    <div class="practice-list" id="practice-list"></div>
   </details>
 </section>
 
@@ -311,7 +318,7 @@ class LocalNet {
     this.room = new Core.Room('SOLO', { send: (pid, m) => { if (pid === 'me') setTimeout(() => this.h(m), 0); }, onEmpty() {} });
   }
   send(m) {
-    if (m.type === 'create') { this.room.addPlayer('me', m.name); for (let i = 0; i < (m.bots | 0); i++) this.room.addBot(); return; }
+    if (m.type === 'create') { this.room.addPlayer('me', m.name); for (let i = 0; i < (m.bots | 0); i++) this.room.addBot(); if (m.game) this.room.handle('me', { type: 'startsingle', game: m.game }); return; }
     if (m.type === 'ping') return this.h({ type: 'pong', t: m.t, now: Date.now() });
     this.room.handle('me', m);
   }
@@ -319,7 +326,7 @@ class LocalNet {
 }
 
 // ---------- app state ----------
-const S = { me: null, code: null, host: null, players: [], offset: 0, lobbyState: 'lobby', chaosMode: false };
+const S = { me: null, code: null, host: null, players: [], offset: 0, lobbyState: 'lobby', chaosMode: false, skipLobby: false };
 const nameInput = $('#name');
 nameInput.value = localStorage.getItem('aimchaos-name') || Core.randomNick();
 $('#reroll').onclick = () => nameInput.value = Core.randomNick();
@@ -345,8 +352,11 @@ function connectingMsg() {
 $('#btn-create').onclick = () => { connectingMsg(); connect(false, { type: 'create', name: myName() }); };
 $('#btn-join').onclick = () => { const code = $('#code').value.trim().toUpperCase(); if (code.length !== 4) return $('#menu-msg').textContent = 'Room codes are 4 characters'; connectingMsg(); connect(false, { type: 'join', code, name: myName() }); };
 $('#btn-solo').onclick = () => connect(true, { type: 'create', name: myName(), bots: 3 });
+function practiceGame(gameId) { S.skipLobby = true; connect(true, { type: 'create', name: myName(), bots: 3, game: gameId }); }
+$('#practice-list').innerHTML = Core.MINIGAMES.map(g => `<button data-game="${g.id}">${esc(g.name)}</button>`).join('');
+$('#practice-list').querySelectorAll('button').forEach(b => b.onclick = () => practiceGame(b.dataset.game));
 $('#code').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-join').click(); });
-const leave = () => { if (net) net.close(); net = null; SFX.stopMusic(); G.active = false; show('#s-menu'); $('#menu-msg').textContent = ''; };
+const leave = () => { if (net) net.close(); net = null; SFX.stopMusic(); G.active = false; S.skipLobby = false; show('#s-menu'); $('#menu-msg').textContent = ''; };
 $('#btn-leave').onclick = leave; $('#btn-leave2').onclick = leave;
 const quitMatch = () => { if (confirm('Leave the match?')) leave(); };
 $('#btn-quit').onclick = quitMatch; $('#btn-quit2').onclick = quitMatch;
@@ -373,8 +383,8 @@ function renderLobby() {
 
 function handle(m) {
   switch (m.type) {
-    case 'joined': S.me = m.you; S.code = m.code; S.ready = false; if (S.offset === 0 && !(net instanceof LocalNet)) S.offset = m.now - Date.now(); $('#lobby-code').textContent = m.code; show('#s-lobby'); break;
-    case 'lobby': S.players = m.players; S.host = m.host; S.chaosMode = m.chaosMode; if (m.state === 'lobby') { show('#s-lobby'); renderLobby(); } break;
+    case 'joined': S.me = m.you; S.code = m.code; S.ready = false; if (S.offset === 0 && !(net instanceof LocalNet)) S.offset = m.now - Date.now(); $('#lobby-code').textContent = m.code; if (!S.skipLobby) show('#s-lobby'); break;
+    case 'lobby': S.players = m.players; S.host = m.host; S.chaosMode = m.chaosMode; if (m.state === 'lobby' && !S.skipLobby) { show('#s-lobby'); renderLobby(); } break;
     case 'error': $('#menu-msg').textContent = m.text; $('#final-msg').textContent = m.text; break;
     case 'disconnected': if (net) { $('#menu-msg').textContent = 'Connection lost'; leave(); } break;
     case 'pong': S.onPong && S.onPong(m); break;
@@ -431,6 +441,7 @@ function visibleTargets(t) {
 function radiusOf(tg, t) { return tg.r * (tinyNow(t) ? 0.62 : 1); }
 
 function startRound(m) {
+  S.skipLobby = false;
   G.round = Core.generateRound(m.seed, m.game, { chaosMode: m.chaosMode });
   G.startLocal = m.startAt - S.offset;
   G.players = m.players; G.scores = {}; m.players.forEach(p => G.scores[p.id] = { score: p.score, combo: 0 });
@@ -778,7 +789,7 @@ function onFinal(m) {
   $('#final-awards').innerHTML = m.awards.map(a => `<div class="aw"><div class="t">${esc(a.title)}</div><div class="n" style="color:${a.color}">${esc(a.name)}</div><div class="v">${esc(a.value)}</div></div>`).join('');
   $('#final-board').innerHTML = m.board.map(p => boardRow(p, '', `${p.accuracy}% accuracy, ${p.hits} hits, ${p.misses} misses, ${p.maxCombo}x combo${p.fastest ? ', ' + p.fastest + 'ms' : ''}`)).join('');
   const isHost = S.host === S.me;
-  $('#btn-again').style.display = isHost ? '' : 'none'; $('#btn-chaos').style.display = isHost ? '' : 'none';
+  $('#btn-again').style.display = isHost && !m.single ? '' : 'none'; $('#btn-chaos').style.display = isHost && !m.single ? '' : 'none';
   $('#final-msg').textContent = isHost ? '' : 'Waiting for the host to start another match';
   show('#s-final');
   (me && me.rank === 1) ? SFX.victory() : SFX.defeat();

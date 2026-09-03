@@ -311,6 +311,8 @@
       this.chaosMode = false;
       this.timers = [];
       this.usedGames = new Set();
+      this.totalRounds = ROUNDS;
+      this.forcedGame = null;
       this.roundWins = {};
       this.feed = [];
     }
@@ -359,6 +361,7 @@
         case 'name': if (this.state === 'lobby') { p.name = String(msg.name || '').trim().slice(0, 14) || p.name; this.broadcast(this.lobbyState()); } break;
         case 'addbot': if (pid === this.host && this.state === 'lobby') this.addBot(); break;
         case 'start': if (pid === this.host && this.state === 'lobby') this.startMatch(!!msg.chaosMode); break;
+        case 'startsingle': if (pid === this.host && this.state === 'lobby') this.startSingle(msg.game); break;
         case 'again': if (pid === this.host && this.state === 'final') this.startMatch(false); break;
         case 'chaosmode': if (pid === this.host && this.state === 'final') this.startMatch(true); break;
         case 'hit': this.onHit(p, msg); break;
@@ -369,21 +372,28 @@
       }
     }
 
-    startMatch(chaosMode) {
+    beginMatch(chaosMode, totalRounds, forcedGame) {
       this.chaosMode = chaosMode;
       this.roundNo = 0;
       this.roundWins = {};
       this.usedGames = new Set();
+      this.totalRounds = totalRounds;
+      this.forcedGame = forcedGame || null;
       for (const p of this.players.values()) {
         Object.assign(p, { score: 0, combo: 0, maxCombo: 0, hits: 0, misses: 0, fakes: 0, wrong: 0, jumps: 0, puUsed: 0, reactions: [], powerups: [], shield: false, roundScores: [], rankHistory: [] });
       }
       this.startRound();
     }
+    startMatch(chaosMode) { this.beginMatch(!!chaosMode, ROUNDS, null); }
+    startSingle(gameId) {
+      const valid = MINIGAMES.some(m => m.id === gameId);
+      this.beginMatch(false, 1, valid ? gameId : null);
+    }
 
     startRound() {
       this.clearTimers();
       this.roundNo++;
-      const gid = pickGame(this.roundNo, this.chaosMode, this.usedGames);
+      const gid = this.forcedGame || pickGame(this.roundNo, this.chaosMode, this.usedGames);
       this.usedGames.add(gid);
       const seed = (Math.random() * 0xffffffff) >>> 0;
       this.round = generateRound(seed, gid, { chaosMode: this.chaosMode });
@@ -395,7 +405,7 @@
       }
       this.startAt = this.now() + 3500;
       this.state = 'countdown';
-      this.broadcast({ type: 'round', n: this.roundNo, of: ROUNDS, game: gid, seed, startAt: this.startAt, duration: this.round.duration, chaosMode: this.chaosMode, now: this.now(), players: this.publicPlayers() });
+      this.broadcast({ type: 'round', n: this.roundNo, of: this.totalRounds, game: gid, seed, startAt: this.startAt, duration: this.round.duration, chaosMode: this.chaosMode, now: this.now(), players: this.publicPlayers() });
       this.later(3500, () => { this.state = 'playing'; this.scoreTick(); });
       this.later(3500 + this.round.duration + 400, () => this.endRound());
       for (const p of this.players.values()) if (p.bot) this.runBot(p);
@@ -557,8 +567,8 @@
       const best = [...this.players.values()].sort((a, b) => (b.score - b.roundStart) - (a.score - a.roundStart))[0];
       if (best) this.roundWins[best.id] = (this.roundWins[best.id] || 0) + 1;
       const board = ranked.map((p, i) => ({ id: p.id, name: p.name, color: p.color, score: p.score, roundScore: p.score - p.roundStart, rank: i + 1, prevRank: p.rankHistory.length > 1 ? p.rankHistory[p.rankHistory.length - 2] : i + 1, maxCombo: p.maxCombo }));
-      const last = this.roundNo >= ROUNDS;
-      this.broadcast({ type: 'roundend', n: this.roundNo, of: ROUNDS, game: this.round.game, board, roundWinner: best ? best.id : null, next: last ? 'final' : 'round', in: last ? 2500 : 5000 });
+      const last = this.roundNo >= this.totalRounds;
+      this.broadcast({ type: 'roundend', n: this.roundNo, of: this.totalRounds, game: this.round.game, board, roundWinner: best ? best.id : null, next: last ? 'final' : 'round', in: last ? 2500 : 5000 });
       this.later(last ? 2500 : 5000, () => last ? this.finish() : this.startRound());
     }
     finish() {
@@ -590,7 +600,7 @@
         accuracy: Math.round(acc(p) * 100), hits: p.hits, misses: p.misses + p.wrong + p.fakes, maxCombo: p.maxCombo,
         fastest: isFinite(minR(p)) ? Math.round(minR(p)) : null, roundScores: p.roundScores,
       }));
-      this.broadcast({ type: 'final', board, winner: ranked[0] ? ranked[0].id : null, awards: A, funny: funny && funny[0] > 0 ? funny[1] : ranked[0].name + ' won without breaking a sweat', chaosMode: this.chaosMode });
+      this.broadcast({ type: 'final', board, winner: ranked[0] ? ranked[0].id : null, awards: A, funny: funny && funny[0] > 0 ? funny[1] : ranked[0].name + ' won without breaking a sweat', chaosMode: this.chaosMode, single: this.totalRounds === 1 });
     }
 
     // ---------- bots ----------
