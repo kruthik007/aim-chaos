@@ -180,6 +180,7 @@ h2.big{font-family:var(--display);font-size:clamp(36px,8vw,72px);text-align:cent
     <span class="gname" id="game-name"></span>
     <span class="timer" id="timer">40</span>
     <button class="icon-btn" id="mute" title="Mute">🔊</button>
+    <button class="icon-btn" id="btn-quit" title="Quit match" style="color:var(--red)">✕</button>
   </div>
   <div class="arena">
     <div id="wrapbox"><div id="wrap"><canvas id="c"></canvas></div></div>
@@ -193,6 +194,7 @@ h2.big{font-family:var(--display);font-size:clamp(36px,8vw,72px);text-align:cent
 </section>
 
 <section id="s-round" class="screen">
+  <button class="icon-btn" id="btn-quit2" title="Quit match" style="position:absolute;top:14px;right:16px;color:var(--red)">✕</button>
   <div class="sub" id="round-sub"></div>
   <h2 class="big" id="round-title">Round over</h2>
   <div class="board" id="round-board"></div>
@@ -340,6 +342,8 @@ $('#btn-solo').onclick = () => connect(true, { type: 'create', name: myName(), b
 $('#code').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-join').click(); });
 const leave = () => { if (net) net.close(); net = null; SFX.stopMusic(); G.active = false; show('#s-menu'); $('#menu-msg').textContent = ''; };
 $('#btn-leave').onclick = leave; $('#btn-leave2').onclick = leave;
+const quitMatch = () => { if (confirm('Leave the match?')) leave(); };
+$('#btn-quit').onclick = quitMatch; $('#btn-quit2').onclick = quitMatch;
 $('#btn-ready').onclick = () => { S.ready = !S.ready; net.send({ type: 'ready', ready: S.ready }); };
 $('#btn-bot').onclick = () => net.send({ type: 'addbot' });
 $('#btn-start').onclick = () => net.send({ type: 'start', chaosMode: $('#chaos-toggle').checked });
