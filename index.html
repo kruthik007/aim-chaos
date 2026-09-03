@@ -555,8 +555,9 @@ function floatText(x, y, text, color, size) { G.floats.push({ x, y, text, color,
 function targetColor(tg) {
   switch (tg.kind) {
     case 'gold': return '#ffd02d'; case 'fake': case 'pfake': return '#ff2d4b'; case 'small': return '#ff2d95';
-    case 'bomb': return '#8a3dff'; case 'correct': case 'decoy': return { red: '#ff2d4b', blue: '#2d8cff', green: '#2dff9a', yellow: '#ffd02d' }[tg.color];
+    case 'bomb': return '#8a3dff'; case 'correct': case 'decoy': case 'ccorrect': case 'cwrong': return { red: '#ff2d4b', blue: '#2d8cff', green: '#2dff9a', yellow: '#ffd02d' }[tg.color];
     case 'friend': return (G.players[tg.face % Math.max(1, G.players.length)] || {}).color || '#b6ff2d'; case 'enemy': return '#ff6a2d';
+    case 'ring': return '#ffd02d';
     default: return '#2df0ff';
   }
 }
@@ -680,7 +681,8 @@ function drawTarget(tg, t) {
   at(pos.x, pos.y, () => {
     ctx.globalAlpha = fade;
     if (tg.kind === 'friend' || tg.kind === 'enemy') drawFace(r, color, tg.kind === 'enemy');
-    else if (tg.kind === 'correct' || tg.kind === 'decoy') drawShape(tg.shape, r, color);
+    else if (tg.kind === 'correct' || tg.kind === 'decoy' || tg.kind === 'ccorrect' || tg.kind === 'cwrong') drawShape(tg.shape || 'circle', r, color);
+    else if (tg.kind === 'ring') drawBullseye(r, tg);
     else {
       ctx.shadowColor = color; ctx.shadowBlur = 18;
       ctx.fillStyle = tg.kind === 'gold' ? '#4a3a00' : tg.kind === 'bomb' ? '#2a1250' : '#160f2a'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
@@ -700,6 +702,16 @@ function drawShape(shape, r, color) {
   else if (shape === 'square') ctx.rect(-r * 0.75, -r * 0.75, r * 1.5, r * 1.5);
   else { ctx.moveTo(0, -r * 0.9); ctx.lineTo(r * 0.85, r * 0.65); ctx.lineTo(-r * 0.85, r * 0.65); ctx.closePath(); }
   ctx.fill(); ctx.shadowBlur = 0;
+}
+function drawBullseye(r, tg) {
+  const bands = tg.rings;
+  for (let i = bands.length - 1; i >= 0; i--) {
+    const rr = Math.max(2, r * (bands[i].r / tg.r));
+    ctx.shadowColor = i === 0 ? '#ffd02d' : '#ff2d4b'; ctx.shadowBlur = i === 0 ? 22 : 6;
+    ctx.fillStyle = i === 0 ? '#ffd02d' : (i % 2 === 1 ? '#f4efff' : '#ff2d4b');
+    ctx.beginPath(); ctx.arc(0, 0, rr, 0, 7); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
 }
 function drawFace(r, color, evil) {
   ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 14; ctx.beginPath(); ctx.arc(0, 0, r * 0.9, 0, 7); ctx.fill(); ctx.shadowBlur = 0;

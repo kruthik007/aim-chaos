@@ -17,6 +17,9 @@
     { id: 'dontshoot', name: "Don't Shoot",   tag: 'Read the clue. Only one target matches. Wrong shot costs big.',      duration: 40, weight: 2 },
     { id: 'friendfoe', name: 'Friend or Foe', tag: 'One face is the enemy. It has evil eyebrows. Never shoot a friend.', duration: 40, weight: 2 },
     { id: 'reaction',  name: 'Reaction Test', tag: 'Wait for GREEN, then shoot. First shooter wins. Jump the gun and pay.', duration: 40, weight: 2 },
+    { id: 'bullseye',   name: 'Bullseye',     tag: 'Concentric rings. Dead center pays huge. Precision beats speed.',    duration: 40, weight: 2 },
+    { id: 'colormatch', name: 'Color Match',  tag: 'Shoot only the called color. Any other color costs big.',           duration: 40, weight: 2 },
+    { id: 'whack',       name: 'Whack Streak', tag: 'Targets flash and vanish fast. Chain hits for monster combos.',     duration: 38, weight: 3 },
     { id: 'chaos',     name: 'CHAOS ROUND',   tag: 'Everything is wrong. The screen tilts, controls flip, targets explode.', duration: 45, weight: 1, rare: true },
   ];
 
@@ -178,6 +181,54 @@
       }
     }
 
+    if (g.id === 'bullseye') {
+      let t = 900;
+      while (t < dur - 2200) {
+        const rad = rand(r, 46, 66);
+        const rings = [
+          { r: rad * 0.22, value: 650 },
+          { r: rad * 0.46, value: 320 },
+          { r: rad * 0.74, value: 150 },
+          { r: rad, value: 60 },
+        ];
+        T(Object.assign({ t0: t, life: 2000, r: rad, kind: 'ring', value: rings[rings.length - 1].value, rings }, inside(rad)));
+        t += rand(r, 950, 1350) / speedUp;
+      }
+    }
+
+    if (g.id === 'colormatch') {
+      const COL = ['red', 'blue', 'green', 'yellow'];
+      let t = 1200, w = 0;
+      while (t < dur - 3000) {
+        const n = 5 + (r() < 0.5 ? 1 : 0);
+        const target = pick(r, COL);
+        const pts = spread(n, 28, 26);
+        const wave = 'w' + (w++);
+        const life = 2600;
+        const ids = [];
+        for (let i = 0; i < n; i++) {
+          const others = COL.filter(c => c !== target);
+          const c = i === 0 ? target : (r() < 0.35 ? target : pick(r, others));
+          const o = T({ t0: t, life, r: 28, kind: c === target ? 'ccorrect' : 'cwrong', value: c === target ? 260 : -220, color: c, wave, x: pts[i].x, y: pts[i].y });
+          ids.push(o.id);
+        }
+        R.waves.push({ id: wave, t0: t, life, clue: 'Shoot only ' + target.toUpperCase(), ids });
+        t += 3100 / speedUp;
+      }
+    }
+
+    if (g.id === 'whack') {
+      let t = 500;
+      while (t < dur - 900) {
+        const count = r() < 0.35 ? 2 : 1;
+        for (let k = 0; k < count; k++) {
+          const rad = rand(r, 20, 30);
+          T(Object.assign({ t0: t + k * 60, life: 620, r: rad, kind: 'normal', value: 85 }, inside(rad)));
+        }
+        t += rand(r, 170, 270) / speedUp;
+      }
+    }
+
     // special events
     if (g.id !== 'reaction') {
       const n = chaosMode || g.id === 'chaos' ? 3 : 2;
@@ -226,16 +277,21 @@
     for (const e of activeEvents(round, rt)) { if (e.type === 'x2') m *= 2; if (e.type === 'tiny') m *= 1.5; }
     return m;
   }
-  function hitPoints(round, tg, rt, combo, x2) {
-    if (tg.value < 0) return tg.value;
+  function hitPoints(round, tg, rt, combo, x2, valueOverride) {
+    const val = valueOverride === undefined ? tg.value : valueOverride;
+    if (val < 0) return val;
     const speed = 1 + 0.5 * Math.max(0, 1 - (rt - tg.t0) / tg.life);
     const comboMult = 1 + Math.min(combo, 10) * 0.1;
-    return Math.round(tg.value * speed * comboMult * eventMult(round, rt) * (x2 ? 2 : 1));
+    return Math.round(val * speed * comboMult * eventMult(round, rt) * (x2 ? 2 : 1));
   }
 
-  function pickGame(roundNo, chaosMode, prev) {
-    let pool = MINIGAMES.filter(m => m.id !== prev);
-    if (roundNo <= 2 && !chaosMode) pool = pool.filter(m => !m.rare);
+  function pickGame(roundNo, chaosMode, used) {
+    used = used || new Set();
+    let pool = MINIGAMES.filter(m => !used.has(m.id));
+    if (roundNo <= 2 && !chaosMode) {
+      const noRare = pool.filter(m => !m.rare);
+      if (noRare.length) pool = noRare;
+    }
     const weights = pool.map(m => m.rare ? (chaosMode ? 6 : 1) : m.weight);
     let x = Math.random() * weights.reduce((a, b) => a + b, 0);
     for (let i = 0; i < pool.length; i++) { x -= weights[i]; if (x <= 0) return pool[i].id; }
@@ -254,7 +310,7 @@
       this.round = null;
       this.chaosMode = false;
       this.timers = [];
-      this.lastGame = null;
+      this.usedGames = new Set();
       this.roundWins = {};
       this.feed = [];
     }
@@ -317,6 +373,7 @@
       this.chaosMode = chaosMode;
       this.roundNo = 0;
       this.roundWins = {};
+      this.usedGames = new Set();
       for (const p of this.players.values()) {
         Object.assign(p, { score: 0, combo: 0, maxCombo: 0, hits: 0, misses: 0, fakes: 0, wrong: 0, jumps: 0, puUsed: 0, reactions: [], powerups: [], shield: false, roundScores: [], rankHistory: [] });
       }
@@ -326,8 +383,8 @@
     startRound() {
       this.clearTimers();
       this.roundNo++;
-      const gid = pickGame(this.roundNo, this.chaosMode, this.lastGame);
-      this.lastGame = gid;
+      const gid = pickGame(this.roundNo, this.chaosMode, this.usedGames);
+      this.usedGames.add(gid);
       const seed = (Math.random() * 0xffffffff) >>> 0;
       this.round = generateRound(seed, gid, { chaosMode: this.chaosMode });
       this.targetMap = new Map(this.round.targets.map(t => [t.id, t]));
@@ -379,17 +436,24 @@
       if (tg.value < 0) {
         p.score += tg.value; p.combo = 0;
         if (tg.kind === 'fake' || tg.kind === 'pfake') p.fakes++; else p.wrong++;
-        const msgs = { fake: 'FAKE!', pfake: 'FAKE!', decoy: 'WRONG ONE!', friend: 'THAT WAS A FRIEND!' };
+        const msgs = { fake: 'FAKE!', pfake: 'FAKE!', decoy: 'WRONG ONE!', friend: 'THAT WAS A FRIEND!', cwrong: 'WRONG COLOR!' };
         this.send(p.id, { type: 'fb', kind: 'bad', tid: tg.id, pts: tg.value, combo: 0, msg: msgs[tg.kind] || 'NO!' });
         return;
       }
-      const pts = hitPoints(this.round, tg, rt, p.combo, p.effects.x2Until > now);
+      let ringValue;
+      if (tg.kind === 'ring' && tg.rings) {
+        const cx = typeof msg.x === 'number' ? msg.x : tg.x, cy = typeof msg.y === 'number' ? msg.y : tg.y;
+        const dist = Math.hypot(cx - tg.x, cy - tg.y);
+        ringValue = (tg.rings.find(b => dist <= b.r) || tg.rings[tg.rings.length - 1]).value;
+      }
+      const pts = hitPoints(this.round, tg, rt, p.combo, p.effects.x2Until > now, ringValue);
       p.score += pts; p.combo++; p.hits++;
       p.maxCombo = Math.max(p.maxCombo, p.combo);
       const reaction = rt - tg.t0;
       if (!tg.event && reaction >= 0) p.reactions.push(Math.round(reaction));
       if (tg.wave) p.solvedWaves.add(tg.wave);
-      this.send(p.id, { type: 'fb', kind: tg.kind === 'gold' || tg.kind === 'correct' || tg.kind === 'enemy' ? 'crit' : 'good', tid: tg.id, pts, combo: p.combo, wave: tg.wave });
+      const ringCrit = tg.kind === 'ring' && ringValue === tg.rings[0].value;
+      this.send(p.id, { type: 'fb', kind: tg.kind === 'gold' || tg.kind === 'correct' || tg.kind === 'ccorrect' || tg.kind === 'enemy' || ringCrit ? 'crit' : 'good', tid: tg.id, pts, combo: p.combo, wave: tg.wave });
       if (tg.kind === 'bomb') {
         const kids = [];
         for (let k = 0; k < 4; k++) {
@@ -544,19 +608,28 @@
       for (const w of R.waves) {
         const right = Math.random() < sk * 0.85;
         const ids = w.ids.slice();
-        const correct = ids.find(id => { const k = this.targetMap.get(id).kind; return k === 'correct' || k === 'enemy'; });
+        const correct = ids.find(id => { const k = this.targetMap.get(id).kind; return k === 'correct' || k === 'enemy' || k === 'ccorrect'; });
         const wrongs = ids.filter(id => id !== correct);
         const delay = 500 + Math.random() * 1600 * (1.4 - sk);
         if (right) at(w.t0 + delay, () => this.handle(bot.id, { type: 'hit', tid: correct, t: this.now() - base }));
         else if (Math.random() < 0.6) at(w.t0 + delay, () => this.handle(bot.id, { type: 'hit', tid: pick(Math.random, wrongs), t: this.now() - base }));
       }
       for (const tg of R.targets) {
-        if (tg.wave) continue;
+        if (tg.wave || tg.kind === 'ring') continue;
         const bad = tg.value < 0;
         const shoot = bad ? Math.random() < 0.18 * (1.3 - sk) : Math.random() < sk * 1.1 * (tg.kind === 'gold' ? 0.9 : 1);
         if (!shoot) continue;
         const delay = Math.min(tg.life * 0.9, (220 + Math.random() * 650) * (1.5 - sk) + (tg.r < 22 ? 150 : 0));
         at(tg.t0 + delay, () => this.handle(bot.id, { type: 'hit', tid: tg.id, t: this.now() - base }));
+      }
+      for (const tg of R.targets) {
+        if (tg.kind !== 'ring') continue;
+        if (Math.random() > sk * 0.9 + 0.05) continue;
+        const delay = Math.min(tg.life * 0.85, (300 + Math.random() * 700) * (1.4 - sk));
+        const off = (1.05 - sk) * tg.r * 0.9;
+        const ang = Math.random() * Math.PI * 2, dist = Math.random() * off;
+        const x = Math.round(tg.x + Math.cos(ang) * dist), y = Math.round(tg.y + Math.sin(ang) * dist);
+        at(tg.t0 + delay, () => this.handle(bot.id, { type: 'hit', tid: tg.id, t: this.now() - base, x, y }));
       }
       for (let t = 1500; t < R.duration; t += 1200 + Math.random() * 2200) {
         if (Math.random() < (1.15 - sk) * 0.7) at(t, () => this.handle(bot.id, { type: 'miss', t: this.now() - base }));
